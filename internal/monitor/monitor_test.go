@@ -2,6 +2,7 @@ package monitor
 
 import (
  "context"
+ "math"
  "testing"
  "time"
 )
@@ -23,6 +24,13 @@ func TestLocalSample(t *testing.T){
  if h.Version!="v0.30.00" || h.IP!="" || h.CountryCode!="" || h.MemTotal==0 || h.DiskTotal==0 || h.Arch=="" { t.Fatal("invalid host sample") }
  s,err:=c.State(ctx)
  if err!=nil { t.Fatal(err) }
- if s.CPU<0 || s.CPU>100 || s.NetInSpeed!=0 || s.NetOutSpeed!=0 { t.Fatal("invalid initial state sample") }
+ if s.CPU<0 || s.CPU>100 || s.NetInSpeed!=0 || s.NetOutSpeed!=0 || math.IsNaN(s.Load1) || math.IsInf(s.Load1,0) || s.Load1<0 || s.Load5<0 || s.Load15<0 { t.Fatal("invalid initial state sample") }
  if _,err:=c.State(ctx);err!=nil { t.Fatal(err) }
+}
+
+func TestFiniteNonnegative(t *testing.T){
+ for _,v:=range []float64{math.NaN(),math.Inf(1),math.Inf(-1),-1}{
+  if got:=finiteNonnegative(v);got!=0{t.Fatalf("invalid load %v became %v",v,got)}
+ }
+ if got:=finiteNonnegative(2.5);got!=2.5{t.Fatal(got)}
 }

@@ -16,6 +16,8 @@ import (
  "github.com/shirou/gopsutil/v4/cpu"
  "github.com/shirou/gopsutil/v4/disk"
  "github.com/shirou/gopsutil/v4/host"
+ "github.com/shirou/gopsutil/v4/load"
+ "github.com/shirou/gopsutil/v4/process"
  "github.com/shirou/gopsutil/v4/mem"
  netstat "github.com/shirou/gopsutil/v4/net"
 )
@@ -92,6 +94,22 @@ func (c *Collector) State(ctx context.Context)(*model.HostState,error){
  now:=time.Now()
  result:=&model.HostState{CPU:p[0],MemUsed:m.Used,SwapUsed:s.Used,DiskUsed:d.Used,
   Uptime:up,NetInTransfer:io[0].BytesRecv,NetOutTransfer:io[0].BytesSent}
+ // These supplementary metrics are best-effort: restricted containers and
+ // Windows must not lose core monitoring when a platform API is unavailable.
+ if avg,err:=load.AvgWithContext(ctx);err==nil&&avg!=nil{
+  result.Load1=finiteNonnegative(avg.Load1)
+  result.Load5=finiteNonnegative(avg.Load5)
+  result.Load15=finiteNonnegative(avg.Load15)
+ }
+ if pids,err:=process.PidsWithContext(ctx);err==nil{
+  result.ProcessCount=uint64(len(pids))
+ }
+ if connections,err:=netstat.ConnectionsWithContext(ctx,"tcp");err==nil{
+  result.TcpConnCount=uint64(len(connections))
+ }
+ if connections,err:=netstat.ConnectionsWithContext(ctx,"udp");err==nil{
+  result.UdpConnCount=uint64(len(connections))
+ }
  if !c.last.at.IsZero() {
   seconds:=now.Sub(c.last.at).Seconds()
   result.NetInSpeed=speed(c.last.in,result.NetInTransfer,seconds)
@@ -99,4 +117,9 @@ func (c *Collector) State(ctx context.Context)(*model.HostState,error){
  }
  c.last=counters{in:result.NetInTransfer,out:result.NetOutTransfer,at:now}
  return result,nil
+}
+
+func finiteNonnegative(v float64)float64{
+ if math.IsNaN(v)||math.IsInf(v,0)||v<0{return 0}
+ return v
 }
