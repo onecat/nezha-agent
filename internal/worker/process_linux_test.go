@@ -41,8 +41,8 @@ func authorized(ctx context.Context)bool{
  return len(v)==1&&v[0]=="fixture-secret"
 }
 func(s *reporter) ReportSystemInfo(ctx context.Context,h *pb.Host)(*pb.Receipt,error){
- ok:=authorized(ctx)&&(h.GetVersion()=="v0.30.00"||(s.allowNext.Load()&&h.GetVersion()=="v0.30.01"))
- if ok{s.nextActive.Store(h.GetVersion()=="v0.30.01");s.hosts.Add(1)}
+ ok:=authorized(ctx)&&(h.GetVersion()=="v0.30.00"||(s.allowNext.Load()&&(h.GetVersion()=="v0.30.01"||h.GetVersion()=="v0.30.02")))
+ if ok{s.nextActive.Store(h.GetVersion()!="v0.30.00");s.hosts.Add(1)}
  return &pb.Receipt{Proced:ok},nil
 }
 func(s *reporter) ReportSystemState(ctx context.Context,_ *pb.State)(*pb.Receipt,error){

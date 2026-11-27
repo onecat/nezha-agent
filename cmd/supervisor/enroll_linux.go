@@ -36,7 +36,7 @@ func enrollLocal(path,agentPath,root string)error{
  st,err:=os.Lstat(binary);if err!=nil||!st.Mode().IsRegular()||st.Mode().Perm()&0077!=0{return errors.New("private installed Agent required")}
  out,err:=exec.CommandContext(ctx,binary,"--version").Output();if err!=nil{return errors.New("cannot read installed Agent version")}
  version:=strings.TrimSpace(string(out))
- if version!="v0.30.01"&&version!="v0.30.00"{return errors.New("unsupported initial Agent version")}
+ if version!="v0.30.02"&&version!="v0.30.01"&&version!="v0.30.00"{return errors.New("unsupported initial Agent version")}
  info,err:=client.EnrollUpgrade(ctx);if err!=nil{return err}
  cfg:=settings{Enabled:true,ServerID:info.ServerID,InitialSequence:1,InitialVersion:version,AgentConfig:agentPath,InstallDir:filepath.Join(root,"install"),StateDir:filepath.Join(root,"state"),StageDir:filepath.Join(root,"stage"),Keys:map[string]string{"dashboard-local":hex.EncodeToString(info.Key)}}
  // Persist the pinned key before initializing. On a partial failure, stop

@@ -34,3 +34,11 @@ func TestFilePermissions(t *testing.T){
   if _,err:=Load(p);err==nil{t.Fatal("accepted public configuration")}
  }
 }
+
+func TestNetworkInterfaces(t *testing.T){
+ c,err:=Decode([]byte(`{"server":"localhost:443","client_secret":"test","network_interfaces":["eno1","bond0"]}`))
+ if err!=nil||len(c.NetworkInterfaces)!=2||c.NetworkInterfaces[1]!="bond0"{t.Fatal(c.NetworkInterfaces,err)}
+ for _,s:=range []string{`["eno1","eno1"]`,`[""]`,`["../eth0"]`,`["eth0 eth1"]`,`null`,`"eth0"`}{
+  if _,err:=Decode([]byte(`{"server":"localhost:443","client_secret":"test","network_interfaces":`+s+`}`));err==nil{t.Fatal("accepted",s)}
+ }
+}

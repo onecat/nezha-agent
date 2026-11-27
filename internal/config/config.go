@@ -8,6 +8,7 @@ import (
  "io"
  "os"
  "runtime"
+ "strings"
  "time"
 
  "github.com/onecat/nezha-agent/internal/ipquery"
@@ -20,6 +21,7 @@ type Config struct {
  Interval time.Duration
  IP ipquery.Config
  PreferIPv6Geo bool
+ NetworkInterfaces []string
 }
 
 func Defaults() Config {
@@ -52,6 +54,7 @@ func Decode(data []byte)(Config,error){
   case "ip_query_ipv6":dst=&cfg.IP.IPv6
   case "ip_query_endpoints":dst=&cfg.IP.Endpoints
   case "prefer_ipv6_geo":dst=&cfg.PreferIPv6Geo
+  case "network_interfaces":dst=&cfg.NetworkInterfaces
   default:return Config{},errors.New("unknown configuration key")
   }
   if err:=json.Unmarshal(raw,dst);err!=nil{return Config{},errors.New("invalid configuration value type")}
@@ -63,6 +66,12 @@ func Decode(data []byte)(Config,error){
  if token,err=d.Token();err!=nil || token!=json.Delim('}') {return Config{},errors.New("invalid configuration ending")}
  if _,err=d.Token();err!=io.EOF{return Config{},errors.New("trailing configuration data")}
  if cfg.Address=="" || cfg.Secret=="" {return Config{},errors.New("server and client_secret required")}
+ if len(cfg.NetworkInterfaces)>128{return Config{},errors.New("too many network interfaces")}
+ interfaces:=map[string]bool{}
+ for _,name:=range cfg.NetworkInterfaces{
+  if name==""||name=="."||name==".."||len(name)>128||strings.ContainsAny(name," /\\\\\t\r\n\x00")||interfaces[name]{return Config{},errors.New("invalid or duplicate network interface")}
+  interfaces[name]=true
+ }
  if _,err:=ipquery.New(cfg.IP);err!=nil{return Config{},err}
  return cfg,nil
 }

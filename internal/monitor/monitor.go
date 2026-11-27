@@ -17,16 +17,13 @@ import (
  "github.com/shirou/gopsutil/v4/disk"
  "github.com/shirou/gopsutil/v4/host"
  "github.com/shirou/gopsutil/v4/mem"
- netstat "github.com/shirou/gopsutil/v4/net"
 )
 
 type Collector struct {
  mu sync.Mutex
- last counters
-}
-type counters struct {
- in,out uint64
- at time.Time
+ // NetworkInterfaces is an optional immutable allowlist for this collector.
+ NetworkInterfaces []string
+ network networkTracker
 }
 
 func rootDisk() string {
@@ -86,17 +83,9 @@ func (c *Collector) State(ctx context.Context)(*model.HostState,error){
  if err!=nil { return nil,err }
  up,err:=host.UptimeWithContext(ctx)
  if err!=nil { return nil,err }
- io,err:=netstat.IOCountersWithContext(ctx,false)
- if err!=nil { return nil,err }
- if len(io)!=1 { return nil,errors.New("missing network counters") }
- now:=time.Now()
- result:=&model.HostState{CPU:p[0],MemUsed:m.Used,SwapUsed:s.Used,DiskUsed:d.Used,
-  Uptime:up,NetInTransfer:io[0].BytesRecv,NetOutTransfer:io[0].BytesSent}
- if !c.last.at.IsZero() {
-  seconds:=now.Sub(c.last.at).Seconds()
-  result.NetInSpeed=speed(c.last.in,result.NetInTransfer,seconds)
-  result.NetOutSpeed=speed(c.last.out,result.NetOutTransfer,seconds)
- }
- c.last=counters{in:result.NetInTransfer,out:result.NetOutTransfer,at:now}
- return result,nil
+ sample,err:=networkSample(ctx,c.NetworkInterfaces)
+ if err!=nil{return nil,err}
+ in,out,inSpeed,outSpeed:=c.network.update(sample,time.Now())
+ return &model.HostState{CPU:p[0],MemUsed:m.Used,SwapUsed:s.Used,DiskUsed:d.Used,
+  Uptime:up,NetInTransfer:in,NetOutTransfer:out,NetInSpeed:inSpeed,NetOutSpeed:outSpeed},nil
 }

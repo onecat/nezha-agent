@@ -37,11 +37,11 @@ func buildVersion(t *testing.T,version string)[]byte{
 // qualification of independently published versions or the Dashboard process.
 func TestRealSignedUpgradeAndRollback(t *testing.T){
  oldBinary:=buildVersion(t,"v0.30.00")
- newBinary:=buildVersion(t,"v0.30.01")
+ newBinary:=buildVersion(t,"v0.30.02")
  pub,priv,err:=ed25519.GenerateKey(rand.Reader)
  if err!=nil{t.Fatal(err)}
  keys:=map[string]ed25519.PublicKey{"integration":pub}
- manifest:=core.Manifest{Version:"v0.30.01",MinAgentVersion:"v0.30.00",OS:"linux",Arch:runtime.GOARCH,SigningKeyID:"integration",ReleaseSequence:2}
+ manifest:=core.Manifest{Version:"v0.30.02",MinAgentVersion:"v0.30.00",OS:"linux",Arch:runtime.GOARCH,SigningKeyID:"integration",ReleaseSequence:2}
  var archive bytes.Buffer
  if _,err:=core.BuildPackage(&archive,bytes.NewReader(newBinary),int64(len(newBinary)),manifest,priv);err!=nil{t.Fatal(err)}
  signed,err:=core.VerifyPackage(bytes.NewReader(archive.Bytes()),int64(archive.Len()),keys)
@@ -98,7 +98,7 @@ func TestRealSignedUpgradeAndRollback(t *testing.T){
    out,err:=supervisor.Apply(applyCtx,task,stage,int64(archive.Len()),keys,"v0.30.00")
    expected:=newBinary
    wantState:=core.StateSucceeded
-   wantVersion:="v0.30.01"
+   wantVersion:="v0.30.02"
    if mode!="success"{
     expected=oldBinary;wantState=core.StateRolledBack;wantVersion="v0.30.00"
    }

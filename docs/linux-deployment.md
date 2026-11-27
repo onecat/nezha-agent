@@ -53,3 +53,5 @@ For a fresh installation with Dashboard v0.30.08 in automatic URL mode, retain t
     /usr/local/bin/nezha-supervisor --enroll --config /etc/nezha/supervisor.json --agent-config /etc/nezha/agent.json --root /var/lib/nezha-agent
 
 The certificate-validated TLS connection returns the authenticated server ID and Dashboard public key. The supervisor pins it in the private configuration and initializes a new ledger. Do not reset an existing ledger or overwrite an existing supervisor configuration; existing managed installations require explicit migration. The running service uses the same --config as before. No private signing key is copied to the Agent. A Dashboard key change requires explicit local review.
+
+For v0.30.02 and later, the current release Supervisor accepts the v0.30.02 initial worker version for new enrollment. Existing enrolled v0.30.01 installations update only the worker via the Dashboard raw binary URL; do not reset the ledger or reinstall the supervisor. See monitoring.md for optional network_interfaces configuration.
