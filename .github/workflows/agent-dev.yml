@@ -86,7 +86,8 @@ jobs:
         run: git diff --exit-code -- go.mod go.sum
 
   release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/managed-upgrade-v0.30.00' && github.event.head_commit.message == 'release: qualify and publish Agent v0.30.00'
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/managed-upgrade-v0.30.00' && github.event.head_commit.message == 'release: qualify and publish Agent v0.30.00'
     needs: [baseline, security-regression]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
