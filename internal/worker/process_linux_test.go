@@ -55,7 +55,7 @@ func TestRealAgentProcessReadiness(t *testing.T){
  dir:=t.TempDir()
  buildCtx,cancelBuild:=context.WithTimeout(context.Background(),3*time.Minute)
  defer cancelBuild()
- cmd:=exec.CommandContext(buildCtx,"go","build","-mod=mod","-o",filepath.Join(dir,"nezha-agent"),"../../cmd/agent")
+ cmd:=exec.CommandContext(buildCtx,"go","build","-mod=readonly","-ldflags=-X main.version=v0.30.00","-o",filepath.Join(dir,"nezha-agent"),"../../cmd/agent")
  if b,err:=cmd.CombinedOutput();err!=nil{t.Fatalf("build worker: %v %s",err,b)}
  config,fixture:=localReporter(t,dir)
  p,err:=New(dir,config)
