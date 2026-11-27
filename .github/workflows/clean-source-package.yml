@@ -1,0 +1,74 @@
+name: Prepare clean source v0.30.04
+on:
+  push:
+    branches: [clean-source-v0.30.04]
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b4a78fd5dc44e22b57aec5587ce53bbca96f0307
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.4'
+          cache: false
+      - name: Package only build source and necessary assets
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "b4a78fd5dc44e22b57aec5587ce53bbca96f0307"
+          root="$RUNNER_TEMP/nezha-agent-v0.30.04"
+          mkdir -p "$root"
+          cp -a cmd internal model pkg proto go.mod go.sum LICENSE RELEASE_V03004.md "$root/"
+          find "$root" -type f -name '*_test.go' -delete
+          cat > "$root/SOURCE.md" <<'EOF'
+          Source: onecat/nezha-agent v0.30.04 (b4a78fd5dc44e22b57aec5587ce53bbca96f0307)
+          Go 1.27.4, Linux amd64. No CGO, GCC, Python or standalone installation script required for compilation.
+          Build:
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -mod=readonly -trimpath -tags=netgo,osusergo -ldflags="-s -w -X main.version=v0.30.04" -o nezha-agent ./cmd/agent
+          The Go module download may require access to the configured Go proxy. Tests, deployment scripts, CI workflows and old release notes omitted. Go compatibility code including legacy supervisor source is retained, but only cmd/agent is needed for the current single-binary deployment. No production configuration or credentials included.
+          EOF
+          cd "$RUNNER_TEMP"
+          zip -q -r "nezha-agent-v0.30.04-source.zip" "nezha-agent-v0.30.04"
+          unzip -t "nezha-agent-v0.30.04-source.zip"
+          mkdir -p source-verify
+          unzip -q "nezha-agent-v0.30.04-source.zip" -d source-verify
+          cd "source-verify/nezha-agent-v0.30.04"
+          test ! -e .github
+          test ! -e script
+          test -z "$(find . -type f -name '*_test.go' -print -quit)"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -mod=readonly -trimpath -tags=netgo,osusergo -ldflags='-s -w -X main.version=v0.30.04' -o "$RUNNER_TEMP/source-check" ./cmd/agent
+          test "$("$RUNNER_TEMP/source-check" --version)" = v0.30.04
+          echo 'Clean source archive compiled successfully'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nezha-agent-v0.30.04-source
+          path: ${{ runner.temp }}/nezha-agent-v0.30.04-source.zip
+          if-no-files-found: error
+          retention-days: 90
+  publish:
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: nezha-agent-v0.30.04-source
+          path: dist
+      - name: Attach source ZIP without changing existing release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/onecat/nezha-agent/git/ref/tags/v0.30.04 --jq '.object.sha')" = "b4a78fd5dc44e22b57aec5587ce53bbca96f0307"
+          test "$(gh release view v0.30.04 --json isDraft,isPrerelease --jq '.isDraft or .isPrerelease')" = false
+          test -s "dist/nezha-agent-v0.30.04-source.zip"
+          unzip -t "dist/nezha-agent-v0.30.04-source.zip"
+          gh release upload v0.30.04 "dist/nezha-agent-v0.30.04-source.zip"
