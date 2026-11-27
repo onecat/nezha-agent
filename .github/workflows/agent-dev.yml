@@ -22,10 +22,10 @@ jobs:
           cache: false
       - name: Test and build
         run: |
-          go test -mod=mod -race -count=1 ./...
-          go vet -mod=mod ./...
-          go build -mod=mod ./cmd/agent ./cmd/supervisor
-          go run -mod=mod ./cmd/agent --version
+          go test -mod=readonly -race -count=1 ./...
+          go vet -mod=readonly ./...
+          go build -mod=readonly ./cmd/agent ./cmd/supervisor
+          go run -mod=readonly ./cmd/agent --version
       - name: Cross-compile Linux arm64
         if: runner.os == 'Linux' && runner.arch == 'X64'
         env:
@@ -33,8 +33,8 @@ jobs:
           GOARCH: arm64
           CGO_ENABLED: '0'
         run: |
-          go build -mod=mod -o agent-arm64 ./cmd/agent
-          go build -mod=mod -o supervisor-arm64 ./cmd/supervisor
+          go build -mod=readonly -o agent-arm64 ./cmd/agent
+          go build -mod=readonly -o supervisor-arm64 ./cmd/supervisor
 
   security-regression:
     runs-on: ubuntu-24.04
@@ -51,9 +51,8 @@ jobs:
           cache: false
       - name: Resolve and inspect exact dependency lock
         run: |
-          go mod tidy
           go mod verify
-          git diff -- go.mod go.sum
+          go mod tidy -diff
       - name: Readonly tests and vet
         run: |
           go test -mod=readonly -count=1 ./...
