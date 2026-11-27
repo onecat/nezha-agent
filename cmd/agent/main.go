@@ -19,7 +19,8 @@ import (
  "github.com/onecat/nezha-agent/internal/report"
 )
 
-const version="v0.30.00"
+// Version is set at build time by the release pipeline. The default is the development baseline.
+var version="v0.30.00"
 
 func roots(path string)(*x509.CertPool,error){
  if path=="" {return nil,nil}
