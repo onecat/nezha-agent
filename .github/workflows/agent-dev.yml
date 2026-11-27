@@ -1,4 +1,4 @@
-name: Agent baseline checks
+name: Agent development checks
 on:
   push:
     branches: [managed-upgrade-v0.30.00]
@@ -11,7 +11,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,7 +20,16 @@ jobs:
         with:
           go-version: '1.27.4'
           cache: false
-      - name: Compile inherited protocol and model
+      - name: Test and build
         run: |
           go test -mod=mod -race -count=1 ./...
           go vet -mod=mod ./...
+          go build -mod=mod ./cmd/agent
+          go run -mod=mod ./cmd/agent --version
+      - name: Cross-compile Linux arm64
+        if: runner.os == 'Linux'
+        env:
+          GOOS: linux
+          GOARCH: arm64
+          CGO_ENABLED: '0'
+        run: go build -mod=mod -o agent-arm64 ./cmd/agent
