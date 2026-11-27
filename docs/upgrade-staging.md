@@ -1,0 +1,5 @@
+# Private Agent package staging
+
+The receiver writes bounded contiguous chunks to a private local temporary file, checks task expiry and identity, then verifies complete digest, Ed25519 signature, manifest platform/version and high-water sequence. Sealing exposes a read-only ReaderAt of the verified archive. Failure and normal close remove staging bytes; abrupt process termination can leave an orphan file, requiring future startup cleanup. No resume is implemented: restart must discard incomplete transfers and begin from zero. On Windows, the operator must establish restricted ACLs; Unix rejects group/other directory permissions. The directory and its ancestors must be trusted. No archive path is executed or extracted by this module.
+
+This module is not connected to the network, state store or installer. A supervisor must authenticate the task, use the provisioned trust keys, enforce expiry with a real clock, reserve the verified sequence durably before installation, and ensure no concurrent stage operations. Tests use signed synthetic archives and real local files on Linux and Windows; they do not run an executable.
