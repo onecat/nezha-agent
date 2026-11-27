@@ -7,6 +7,7 @@ import (
  "errors"
  "io"
  "os"
+ "strings"
  "runtime"
  "time"
 
@@ -20,6 +21,7 @@ type Config struct {
  Interval time.Duration
  IP ipquery.Config
  PreferIPv6Geo bool
+ ExcludedInterfaces []string
 }
 
 func Defaults() Config {
@@ -52,6 +54,7 @@ func Decode(data []byte)(Config,error){
   case "ip_query_ipv6":dst=&cfg.IP.IPv6
   case "ip_query_endpoints":dst=&cfg.IP.Endpoints
   case "prefer_ipv6_geo":dst=&cfg.PreferIPv6Geo
+  case "exclude_network_interfaces":dst=&cfg.ExcludedInterfaces
   default:return Config{},errors.New("unknown configuration key")
   }
   if err:=json.Unmarshal(raw,dst);err!=nil{return Config{},errors.New("invalid configuration value type")}
@@ -62,6 +65,9 @@ func Decode(data []byte)(Config,error){
  }
  if token,err=d.Token();err!=nil || token!=json.Delim('}') {return Config{},errors.New("invalid configuration ending")}
  if _,err=d.Token();err!=io.EOF{return Config{},errors.New("trailing configuration data")}
+ if len(cfg.ExcludedInterfaces)>64{return Config{},errors.New("too many excluded interfaces")}
+ unique:=map[string]bool{}
+ for _,name:=range cfg.ExcludedInterfaces{if name==""||len(name)>128||strings.TrimSpace(name)!=name||unique[name]{return Config{},errors.New("invalid excluded interface name")};unique[name]=true}
  if cfg.Address=="" || cfg.Secret=="" {return Config{},errors.New("server and client_secret required")}
  if _,err:=ipquery.New(cfg.IP);err!=nil{return Config{},err}
  return cfg,nil

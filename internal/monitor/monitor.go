@@ -27,6 +27,7 @@ import (
 type Collector struct {
  mu sync.Mutex
  last counters
+ ExcludedInterfaces []string
 }
 type counters struct {
  in,out uint64
@@ -90,12 +91,13 @@ func (c *Collector) State(ctx context.Context)(*model.HostState,error){
  if err!=nil { return nil,err }
  up,err:=host.UptimeWithContext(ctx)
  if err!=nil { return nil,err }
- io,err:=netstat.IOCountersWithContext(ctx,false)
+ io,err:=netstat.IOCountersWithContext(ctx,len(c.ExcludedInterfaces)>0)
  if err!=nil { return nil,err }
- if len(io)!=1 { return nil,errors.New("missing network counters") }
+ recv,sent,err:=aggregateNetwork(io,c.ExcludedInterfaces)
+ if err!=nil{return nil,err}
  now:=time.Now()
  result:=&model.HostState{CPU:p[0],MemUsed:m.Used,SwapUsed:s.Used,DiskUsed:d.Used,
-  Uptime:up,NetInTransfer:io[0].BytesRecv,NetOutTransfer:io[0].BytesSent}
+  Uptime:up,NetInTransfer:recv,NetOutTransfer:sent}
  // These supplementary metrics are best-effort: restricted containers and
  // Windows must not lose core monitoring when a platform API is unavailable.
  if avg,err:=load.AvgWithContext(ctx);err==nil&&avg!=nil{
@@ -153,4 +155,19 @@ func normalizeTemperatures(sensors []sensors.TemperatureStat) []model.SensorTemp
   if len(result)==maxSensors{break}
  }
  return result
+}
+
+ // aggregateNetwork excludes only exact, explicitly named interfaces. The
+ // unfiltered default retains historical OS-wide counter behavior.
+func aggregateNetwork(items []netstat.IOCountersStat, excluded []string)(uint64,uint64,error){
+ if len(items)==0{return 0,0,errors.New("missing network counters")}
+ deny:=make(map[string]bool,len(excluded))
+ for _,name:=range excluded{deny[name]=true}
+ var recv,sent uint64
+ for _,item:=range items{
+  if deny[item.Name]{continue}
+  if math.MaxUint64-recv<item.BytesRecv||math.MaxUint64-sent<item.BytesSent{return 0,0,errors.New("network counter overflow")}
+  recv+=item.BytesRecv;sent+=item.BytesSent
+ }
+ return recv,sent,nil
 }

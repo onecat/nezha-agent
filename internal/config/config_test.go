@@ -21,9 +21,16 @@ func TestInvalid(t *testing.T){
   `{"server":"x","client_secret":"s","report_interval_seconds":0}`,
   `{"server":"x","client_secret":null}`,`{"server":"x","client_secret":"s"}{}`,
   `{"server":"x","client_secret":"s","ip_query_endpoints":["http://example.com"]}`,
+  `{"server":"x","client_secret":"s","exclude_network_interfaces":["lo","lo"]}`,
+  `{"server":"x","client_secret":"s","exclude_network_interfaces":[""]}`,
+  `{"server":"x","client_secret":"s","exclude_network_interfaces":null}`,
  }{
   if _,err:=Decode([]byte(s));err==nil{t.Fatal("invalid configuration accepted")}
  }
+}
+func TestExcludedInterfaces(t *testing.T){
+ c,err:=Decode([]byte(`{"server":"localhost:443","client_secret":"test","exclude_network_interfaces":["lo","docker0"]}`))
+ if err!=nil||len(c.ExcludedInterfaces)!=2||c.ExcludedInterfaces[0]!="lo"{t.Fatal(c,err)}
 }
 func TestFilePermissions(t *testing.T){
  p:=filepath.Join(t.TempDir(),"agent.json")

@@ -31,7 +31,7 @@ func run(ctx context.Context,path string,ready func()error)error{
  defer c.Close()
  q,err:=ipquery.New(cfg.IP)
  if err!=nil{return err}
- l:=report.Loop{Collector:new(monitor.Collector),Dashboard:c,Version:version,Interval:cfg.Interval,
+ l:=report.Loop{Collector:&monitor.Collector{ExcludedInterfaces:cfg.ExcludedInterfaces},Dashboard:c,Version:version,Interval:cfg.Interval,
   IPSource:q,GeoLookup:c,PreferIPv6Geo:cfg.PreferIPv6Geo,OnReady:ready,
   OnFailure:func(){log.Print("monitor reporting failed; retrying")},
   OnIPFailure:func(){log.Print("IP discovery or GeoIP lookup unavailable")},

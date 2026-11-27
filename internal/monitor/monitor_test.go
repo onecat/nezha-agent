@@ -2,6 +2,7 @@ package monitor
 
 import (
  "context"
+ netstat "github.com/shirou/gopsutil/v4/net"
  "fmt"
  "math"
  "github.com/shirou/gopsutil/v4/sensors"
@@ -54,4 +55,16 @@ func TestNormalizeTemperatures(t *testing.T){
  many:=make([]sensors.TemperatureStat,100)
  for i:=range many{many[i]=sensors.TemperatureStat{SensorKey:fmt.Sprintf("sensor-%03d",i),Temperature:40}}
  if len(normalizeTemperatures(many))!=64{t.Fatal("unbounded sensors")}
+}
+
+func TestAggregateNetwork(t *testing.T){
+ items:=[]netstat.IOCountersStat{{Name:"eth0",BytesRecv:100,BytesSent:200},{Name:"lo",BytesRecv:50,BytesSent:70}}
+ recv,sent,err:=aggregateNetwork(items,nil)
+ if err!=nil||recv!=150||sent!=270{t.Fatal(recv,sent,err)}
+ recv,sent,err=aggregateNetwork(items,[]string{"lo"})
+ if err!=nil||recv!=100||sent!=200{t.Fatal(recv,sent,err)}
+ recv,sent,err=aggregateNetwork(items,[]string{"lo","eth0"})
+ if err!=nil||recv!=0||sent!=0{t.Fatal(recv,sent,err)}
+ if _,_,err=aggregateNetwork(nil,nil);err==nil{t.Fatal("empty counters accepted")}
+ if _,_,err=aggregateNetwork([]netstat.IOCountersStat{{Name:"a",BytesRecv:math.MaxUint64},{Name:"b",BytesRecv:1}},nil);err==nil{t.Fatal("overflow accepted")}
 }
