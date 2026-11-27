@@ -41,7 +41,7 @@ func (testServer) RequestTask(h *pb.Host,stream pb.NezhaService_RequestTaskServe
  return stream.Send(&pb.Task{Id:7,Type:11})
 }
 
-func startServer(t *testing.T,withTLS bool)(string,*x509.CertPool) {
+func startServer(t *testing.T,withTLS bool,extras ...func(*grpc.Server))(string,*x509.CertPool) {
  t.Helper()
  l,err:=net.Listen("tcp","127.0.0.1:0")
  if err!=nil { t.Fatal(err) }
@@ -61,6 +61,7 @@ func startServer(t *testing.T,withTLS bool)(string,*x509.CertPool) {
  }
  srv:=grpc.NewServer(opts...)
  pb.RegisterNezhaServiceServer(srv,testServer{})
+ for _,register:=range extras{register(srv)}
  go srv.Serve(l)
  t.Cleanup(srv.Stop)
  return l.Addr().String(),roots
