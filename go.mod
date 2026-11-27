@@ -3,6 +3,7 @@ module github.com/onecat/nezha-agent
 go 1.27.0
 
 require (
+ github.com/shirou/gopsutil/v4 v4.26.10
  google.golang.org/grpc v1.85.0
  google.golang.org/protobuf v1.36.12
 )
