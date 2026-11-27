@@ -3,6 +3,7 @@ package monitor
 
 import (
  "context"
+ "sort"
  "errors"
  "math"
  "os"
@@ -110,6 +111,9 @@ func (c *Collector) State(ctx context.Context)(*model.HostState,error){
  if connections,err:=netstat.ConnectionsWithContext(ctx,"udp");err==nil{
   result.UdpConnCount=uint64(len(connections))
  }
+ if sensors,err:=host.SensorsTemperaturesWithContext(ctx);err==nil{
+  result.Temperatures=normalizeTemperatures(sensors)
+ }
  if !c.last.at.IsZero() {
   seconds:=now.Sub(c.last.at).Seconds()
   result.NetInSpeed=speed(c.last.in,result.NetInTransfer,seconds)
@@ -122,4 +126,30 @@ func (c *Collector) State(ctx context.Context)(*model.HostState,error){
 func finiteNonnegative(v float64)float64{
  if math.IsNaN(v)||math.IsInf(v,0)||v<0{return 0}
  return v
+}
+
+ // normalizeTemperatures bounds reported sensor cardinality and discards
+ // invalid values and unnamed sensors. Sorting makes reports deterministic
+ // across platform enumeration order changes.
+func normalizeTemperatures(sensors []host.TemperatureStat) []model.SensorTemperature {
+ const maxSensors=64
+ type reading struct{name string;temperature float64}
+ valid:=make([]reading,0,len(sensors))
+ for _,sensor:=range sensors{
+  name:=strings.TrimSpace(sensor.SensorKey)
+  value:=sensor.Temperature
+  if name==""||len(name)>128||math.IsNaN(value)||math.IsInf(value,0)||value< -100||value>250 {continue}
+  valid=append(valid,reading{name,value})
+ }
+ sort.Slice(valid,func(i,j int)bool{
+  if valid[i].name==valid[j].name{return valid[i].temperature<valid[j].temperature}
+  return valid[i].name<valid[j].name
+ })
+ result:=make([]model.SensorTemperature,0,min(len(valid),maxSensors))
+ for _,v:=range valid{
+  if len(result)>0&&result[len(result)-1].Name==v.name{continue}
+  result=append(result,model.SensorTemperature{Name:v.name,Temperature:v.temperature})
+  if len(result)==maxSensors{break}
+ }
+ return result
 }

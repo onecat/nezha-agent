@@ -2,7 +2,9 @@ package monitor
 
 import (
  "context"
+ "fmt"
  "math"
+ "github.com/shirou/gopsutil/v4/host"
  "testing"
  "time"
 )
@@ -33,4 +35,23 @@ func TestFiniteNonnegative(t *testing.T){
   if got:=finiteNonnegative(v);got!=0{t.Fatalf("invalid load %v became %v",v,got)}
  }
  if got:=finiteNonnegative(2.5);got!=2.5{t.Fatal(got)}
+}
+
+func TestNormalizeTemperatures(t *testing.T){
+ readings:=[]host.TemperatureStat{
+  {SensorKey:" cpu ",Temperature:44},
+  {SensorKey:"cpu",Temperature:46},
+  {SensorKey:"",Temperature:40},
+  {SensorKey:"bad",Temperature:math.NaN()},
+  {SensorKey:"hot",Temperature:300},
+  {SensorKey:"cold",Temperature:-101},
+  {SensorKey:"gpu",Temperature:55},
+ }
+ got:=normalizeTemperatures(readings)
+ if len(got)!=2||got[0].Name!="cpu"||got[0].Temperature!=44||got[1].Name!="gpu"{
+  t.Fatalf("unexpected sensors: %+v",got)
+ }
+ many:=make([]host.TemperatureStat,100)
+ for i:=range many{many[i]=host.TemperatureStat{SensorKey:fmt.Sprintf("sensor-%03d",i),Temperature:40}}
+ if len(normalizeTemperatures(many))!=64{t.Fatal("unbounded sensors")}
 }
