@@ -18,7 +18,7 @@ import (
 )
 
 // Version is set at build time by the release pipeline. The default is the development baseline.
-var version="v0.30.02"
+var version="v0.30.03"
 
 
 func run(ctx context.Context,path string,ready func()error)error{
@@ -39,6 +39,7 @@ func run(ctx context.Context,path string,ready func()error)error{
  return l.Run(ctx)
 }
 func main(){
+ if len(os.Args)>1&&os.Args[1]=="service"{if err:=serviceCommand(os.Args[2:]);err!=nil{log.Print(err);os.Exit(1)};return}
  path:=flag.String("config","agent.json","local private configuration file")
  showVersion:=flag.Bool("version",false,"print version")
  supervised:=flag.Bool("supervised",false,"use private supervisor pipes (Linux only)")
@@ -50,5 +51,6 @@ func main(){
  ready,closePipes,err:=supervisorPipes(ctx,stop,*supervised)
  if err!=nil{log.Print(err);os.Exit(1)}
  defer closePipes()
+ if !*supervised&&isDirectConfig(*path){if err:=runDirect(ctx,*path);err!=nil&&!errors.Is(err,context.Canceled){log.Print(err);os.Exit(1)};return}
  if err:=run(ctx,*path,ready);err!=nil && !errors.Is(err,context.Canceled){log.Print(err);os.Exit(1)}
 }

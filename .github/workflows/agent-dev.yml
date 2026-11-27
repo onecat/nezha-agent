@@ -1,7 +1,7 @@
 name: Agent development checks
 on:
   push:
-    branches: [network-v0.30.02]
+    branches: [single-agent-v0.30.03]
 permissions:
   contents: read
 jobs:
@@ -20,31 +20,22 @@ jobs:
         run: |
           go test -mod=readonly -race -count=1 ./...
           go vet -mod=readonly ./...
-          go build -mod=readonly ./cmd/agent ./cmd/supervisor
+          go build -mod=readonly ./cmd/agent
           go run -mod=readonly ./cmd/agent --version
       - name: Stage native Linux release files
         env:
           GOTOOLCHAIN: local
         run: |
           set -eu
-          arch=$(go env GOARCH)
+          test "$(go env GOARCH)" = amd64
           mkdir -p dist
-          go build -mod=readonly -trimpath -ldflags="-s -w -X main.version=v0.30.02" -o dist/nezha-agent ./cmd/agent
-          go build -mod=readonly -trimpath -ldflags="-s -w" -o dist/nezha-supervisor ./cmd/supervisor
-          test "$(dist/nezha-agent --version)" = v0.30.02
-          cp deploy/nezha-supervisor.service docs/linux-deployment.md LICENSE dist/
-          printf 'Agent=%s\nPlatform=linux/%s\nGo=%s\n' "$GITHUB_SHA" "$arch" "$(go version)" > dist/SOURCES.txt
-          (cd dist && sha256sum * > SHA256SUMS && sha256sum -c SHA256SUMS)
-          tar -C dist -czf "nezha-agent-v0.30.02-linux-$arch.tar.gz" .
-          cp dist/nezha-agent nezha-agent-linux-amd64
-          cp dist/nezha-supervisor nezha-supervisor-linux-amd64
+          go build -mod=readonly -trimpath -ldflags="-s -w -X main.version=v0.30.03" -o dist/nezha-agent ./cmd/agent
+          test "$(dist/nezha-agent --version)" = v0.30.03
+          (cd dist && sha256sum nezha-agent > SHA256SUMS && sha256sum -c SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
           name: agent-release-linux-amd64
-          path: |
-            nezha-agent-v0.30.02-linux-amd64.tar.gz
-            nezha-agent-linux-amd64
-            nezha-supervisor-linux-amd64
+          path: dist/
           if-no-files-found: error
 
   security-regression:
@@ -76,7 +67,7 @@ jobs:
 
   release:
     if: >-
-      github.event_name == 'push' && github.ref == 'refs/heads/network-v0.30.02' && github.event.head_commit.message == 'release: qualify and publish Agent v0.30.02'
+      github.event_name == 'push' && github.ref == 'refs/heads/single-agent-v0.30.03' && github.event.head_commit.message == 'release: qualify and publish Agent v0.30.03'
     needs: [baseline, security-regression]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -96,24 +87,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -eu
-          for arch in amd64; do
-            archive="release-dist/nezha-agent-v0.30.02-linux-$arch.tar.gz"
-            test -s "$archive"
-            temp=$(mktemp -d)
-            tar -xzf "$archive" -C "$temp"
-            (cd "$temp" && sha256sum -c SHA256SUMS)
-            grep -Fx "Agent=$GITHUB_SHA" "$temp/SOURCES.txt"
-            grep -Fx "Platform=linux/$arch" "$temp/SOURCES.txt"
-            if [ "$arch" = amd64 ]; then
-              test "$("$temp/nezha-agent" --version)" = v0.30.02
-            fi
-            rm -rf "$temp"
-          done
-          chmod +x release-dist/nezha-agent-linux-amd64
-          test "$(release-dist/nezha-agent-linux-amd64 --version)" = v0.30.02
-          (cd release-dist && sha256sum *.tar.gz nezha-agent-linux-amd64 nezha-supervisor-linux-amd64 > SHA256SUMS)
-          if gh release view v0.30.02 >/dev/null 2>&1; then
+          chmod +x release-dist/nezha-agent
+          test "$(release-dist/nezha-agent --version)" = v0.30.03
+          (cd release-dist && sha256sum -c SHA256SUMS)
+          if gh release view v0.30.03 >/dev/null 2>&1; then
             echo "Release already exists; refusing to overwrite"
             exit 1
           fi
-          gh release create v0.30.02 release-dist/*.tar.gz release-dist/nezha-agent-linux-amd64 release-dist/nezha-supervisor-linux-amd64 release-dist/SHA256SUMS --target "$GITHUB_SHA" --title "Nezha Agent v0.30.02" --notes-file RELEASE_V03002.md --latest
+          gh release create v0.30.03 release-dist/nezha-agent release-dist/SHA256SUMS --target "$GITHUB_SHA" --title "Nezha Agent v0.30.03" --notes-file RELEASE_V03003.md --latest
