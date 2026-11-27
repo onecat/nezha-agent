@@ -49,6 +49,10 @@ func(r *Runner) RunOnce(ctx context.Context,currentVersion string)(core.Transact
  high,prior,err:=r.state.Snapshot()
  if err!=nil{return zero,err}
  if prior!=nil&&!terminal(*prior){return *prior,errors.New("local recovery required")}
+ installed,_,reported,err:=r.state.VersionInfo()
+ if err!=nil{return zero,err}
+ if installed!=currentVersion{return zero,errors.New("local version mismatch")}
+ if prior!=nil&&!reported{return *prior,errors.New("prior receipt unresolved")}
  d,err:=r.client.DownloadUpgrade(ctx,r.stageDir,r.serverID,currentVersion,"linux",runtime.GOARCH,high,r.keys)
  if err!=nil{return zero,err}
  defer d.Close()
@@ -75,7 +79,8 @@ func(r *Runner) RunOnce(ctx context.Context,currentVersion string)(core.Transact
 func(r *Runner) report(t core.Transaction)error{
  ctx,cancel:=context.WithTimeout(context.Background(),15*time.Second)
  defer cancel()
- return r.client.ReportUpgradeResult(ctx,t)
+ if err:=r.client.ReportUpgradeResult(ctx,t);err!=nil{return err}
+ return r.state.MarkReported(t)
 }
 
 // RetryResult only resends the exact latest durable terminal observation;

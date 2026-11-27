@@ -115,3 +115,10 @@ func(p *Process) Stop(ctx context.Context)error{
  case <-ctx.Done():return ctx.Err()
  }
 }
+
+// Alive checks the exact child has not exited; it is not network health.
+func(p *Process) Alive()bool{
+ p.mu.Lock();defer p.mu.Unlock()
+ if p.cmd==nil{return false}
+ select{case <-p.done:return false;default:return true}
+}

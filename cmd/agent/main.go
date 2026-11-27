@@ -2,11 +2,9 @@ package main
 
 import (
  "context"
- "crypto/x509"
  "errors"
  "flag"
  "fmt"
- "io"
  "log"
  "os"
  "os/signal"
@@ -22,24 +20,11 @@ import (
 // Version is set at build time by the release pipeline. The default is the development baseline.
 var version="v0.30.00"
 
-func roots(path string)(*x509.CertPool,error){
- if path=="" {return nil,nil}
- f,err:=os.Open(path)
- if err!=nil{return nil,errors.New("cannot open CA file")}
- defer f.Close()
- info,err:=f.Stat()
- if err!=nil || !info.Mode().IsRegular(){return nil,errors.New("invalid CA file")}
- b,err:=io.ReadAll(io.LimitReader(f,1024*1024+1))
- if err!=nil || len(b)>1024*1024{return nil,errors.New("invalid CA file size")}
- p:=x509.NewCertPool()
- if !p.AppendCertsFromPEM(b){return nil,errors.New("CA file contains no valid certificates")}
- return p,nil
-}
 
 func run(ctx context.Context,path string,ready func()error)error{
  cfg,err:=config.Load(path)
  if err!=nil{return err}
- pool,err:=roots(cfg.CAFile)
+ pool,err:=config.Roots(cfg.CAFile)
  if err!=nil{return err}
  c,err:=dashboard.New(dashboard.Config{Address:cfg.Address,Secret:cfg.Secret,RootCAs:pool})
  if err!=nil{return err}
