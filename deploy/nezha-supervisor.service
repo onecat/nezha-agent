@@ -1,0 +1,22 @@
+[Unit]
+Description=Nezha local managed Agent supervisor
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=nezha
+Group=nezha
+UMask=0077
+ExecStart=/usr/local/bin/nezha-supervisor --config /etc/nezha/supervisor.json
+Restart=on-failure
+RestartSec=15s
+TimeoutStopSec=120s
+KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/nezha-agent
+[Install]
+WantedBy=multi-user.target

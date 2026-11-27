@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -27,7 +27,7 @@ jobs:
           go build -mod=mod ./cmd/agent ./cmd/supervisor
           go run -mod=mod ./cmd/agent --version
       - name: Cross-compile Linux arm64
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && runner.arch == 'X64'
         env:
           GOOS: linux
           GOARCH: arm64

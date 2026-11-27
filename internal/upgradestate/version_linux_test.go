@@ -15,10 +15,14 @@ func TestVersionAndReceiptDurable(t *testing.T){
  }
  current,previous,reported,err:=s.VersionInfo()
  if err!=nil||current!="v0.30.01"||previous!="v0.30.00"||reported{t.Fatal("incorrect version metadata",err)}
+ next,p2:=fixture(now,3)
+ next.ID="next";next.Version="v0.30.02";p2.Manifest.Version=next.Version
+ if err:=s.ReserveVerified(next,p2,"linux","amd64","v0.30.01",now);err==nil{t.Fatal("unreported result overwritten")}
  if err:=s.MarkReported(task);err!=nil{t.Fatal(err)}
  if err:=s.Close();err!=nil{t.Fatal(err)}
  s,err=Open(dir,42);if err!=nil{t.Fatal(err)}
  defer s.Close()
  current,previous,reported,err=s.VersionInfo()
  if err!=nil||current!="v0.30.01"||previous!="v0.30.00"||!reported{t.Fatal("metadata lost",err)}
+ if err:=s.ReserveVerified(next,p2,"linux","amd64","v0.30.01",now);err!=nil{t.Fatal("reported task did not release reservation",err)}
 }
