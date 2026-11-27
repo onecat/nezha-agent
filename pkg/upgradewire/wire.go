@@ -10,12 +10,16 @@ import (
 
  core "github.com/onecat/nezha-agent/pkg/agentupgrade"
  "google.golang.org/grpc"
+ "google.golang.org/grpc/codes"
+ "google.golang.org/grpc/status"
  "google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 const Service="nezha.upgrade.v1.ManagedUpgrade"
 const DownloadMethod="/"+Service+"/Download"
 const VerifyMethod="/"+Service+"/Verify"
+const GrantMethod="/"+Service+"/Grant"
+const ResultMethod="/"+Service+"/Result"
 const MaxMessage=core.ChunkSize+1024
 const MaxDownloadTime=2*time.Minute
 
@@ -62,7 +66,7 @@ func Register(s grpc.ServiceRegistrar,impl Server){
 var descriptor=grpc.ServiceDesc{
  ServiceName:Service,
  HandlerType:(*Server)(nil),
- Methods:[]grpc.MethodDesc{{MethodName:"Verify",Handler:verifyHandler}},
+ Methods:[]grpc.MethodDesc{{MethodName:"Verify",Handler:verifyHandler},{MethodName:"Grant",Handler:grantHandler},{MethodName:"Result",Handler:resultHandler}},
  Streams:[]grpc.StreamDesc{{StreamName:"Download",ServerStreams:true,Handler:downloadHandler}},
 }
 func downloadHandler(srv any,stream grpc.ServerStream)error{
@@ -92,5 +96,41 @@ func Verify(ctx context.Context,c grpc.ClientConnInterface,t core.Transaction)er
  out:=new(wrapperspb.BytesValue)
  if err:=c.Invoke(ctx,VerifyMethod,wrapperspb.Bytes(b),out,grpc.MaxCallRecvMsgSize(MaxMessage),grpc.MaxCallSendMsgSize(MaxMessage));err!=nil{return err}
  if string(out.Value)!="verified"{return errors.New("invalid verification acknowledgement")}
+ return nil
+}
+
+ // ExecutionServer is optional: download-only implementations fail closed.
+type ExecutionServer interface{
+ Grant(context.Context,*wrapperspb.BytesValue)(*wrapperspb.BytesValue,error)
+ Result(context.Context,*wrapperspb.BytesValue)(*wrapperspb.BytesValue,error)
+}
+func executionHandler(srv any,ctx context.Context,decode func(any)error,interceptor grpc.UnaryServerInterceptor,method string)(any,error){
+ msg:=new(wrapperspb.BytesValue)
+ if err:=decode(msg);err!=nil{return nil,err}
+ impl,ok:=srv.(ExecutionServer)
+ if !ok{return nil,status.Error(codes.Unimplemented,"execution disabled")}
+ call:=func(ctx context.Context,req any)(any,error){
+  if method==GrantMethod{return impl.Grant(ctx,req.(*wrapperspb.BytesValue))}
+  return impl.Result(ctx,req.(*wrapperspb.BytesValue))
+ }
+ if interceptor==nil{return call(ctx,msg)}
+ return interceptor(ctx,msg,&grpc.UnaryServerInfo{Server:srv,FullMethod:method},call)
+}
+func grantHandler(srv any,ctx context.Context,decode func(any)error,i grpc.UnaryServerInterceptor)(any,error){return executionHandler(srv,ctx,decode,i,GrantMethod)}
+func resultHandler(srv any,ctx context.Context,decode func(any)error,i grpc.UnaryServerInterceptor)(any,error){return executionHandler(srv,ctx,decode,i,ResultMethod)}
+func Grant(ctx context.Context,c grpc.ClientConnInterface,t core.Transaction)error{
+ if t.State!=core.StateVerified{return errors.New("invalid grant request")}
+ return executionCall(ctx,c,t,GrantMethod,"installing")
+}
+func Result(ctx context.Context,c grpc.ClientConnInterface,t core.Transaction)error{
+ switch t.State{case core.StateSucceeded,core.StateRolledBack,core.StateFailed:default:return errors.New("nonterminal result")}
+ return executionCall(ctx,c,t,ResultMethod,string(t.State))
+}
+func executionCall(ctx context.Context,c grpc.ClientConnInterface,t core.Transaction,method,want string)error{
+ b,err:=core.EncodeSnapshot(t)
+ if err!=nil{return err}
+ out:=new(wrapperspb.BytesValue)
+ if err:=c.Invoke(ctx,method,wrapperspb.Bytes(b),out,grpc.MaxCallRecvMsgSize(MaxMessage),grpc.MaxCallSendMsgSize(MaxMessage));err!=nil{return err}
+ if string(out.Value)!=want{return errors.New("invalid execution acknowledgement")}
  return nil
 }
