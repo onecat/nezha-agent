@@ -18,7 +18,7 @@ import (
 )
 
 // Version is set at build time by the release pipeline. The default is the development baseline.
-var version="v0.30.00"
+var version="v0.30.01"
 
 
 func run(ctx context.Context,path string,ready func()error)error{

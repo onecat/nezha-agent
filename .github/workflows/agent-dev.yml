@@ -1,16 +1,12 @@
 name: Agent development checks
 on:
   push:
-    branches: [managed-upgrade-v0.30.00]
+    branches: [url-upgrade-v0.30.01]
 permissions:
   contents: read
 jobs:
   baseline:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -26,36 +22,29 @@ jobs:
           go vet -mod=readonly ./...
           go build -mod=readonly ./cmd/agent ./cmd/supervisor
           go run -mod=readonly ./cmd/agent --version
-      - name: Cross-compile Linux arm64
-        if: runner.os == 'Linux' && runner.arch == 'X64'
-        env:
-          GOOS: linux
-          GOARCH: arm64
-          CGO_ENABLED: '0'
-        run: |
-          go build -mod=readonly -o agent-arm64 ./cmd/agent
-          go build -mod=readonly -o supervisor-arm64 ./cmd/supervisor
-
       - name: Stage native Linux release files
-        if: runner.os == 'Linux'
         env:
           GOTOOLCHAIN: local
         run: |
           set -eu
           arch=$(go env GOARCH)
           mkdir -p dist
-          go build -mod=readonly -trimpath -ldflags="-s -w -X main.version=v0.30.00" -o dist/nezha-agent ./cmd/agent
+          go build -mod=readonly -trimpath -ldflags="-s -w -X main.version=v0.30.01" -o dist/nezha-agent ./cmd/agent
           go build -mod=readonly -trimpath -ldflags="-s -w" -o dist/nezha-supervisor ./cmd/supervisor
-          test "$(dist/nezha-agent --version)" = v0.30.00
+          test "$(dist/nezha-agent --version)" = v0.30.01
           cp deploy/nezha-supervisor.service docs/linux-deployment.md LICENSE dist/
           printf 'Agent=%s\nPlatform=linux/%s\nGo=%s\n' "$GITHUB_SHA" "$arch" "$(go version)" > dist/SOURCES.txt
           (cd dist && sha256sum * > SHA256SUMS && sha256sum -c SHA256SUMS)
-          tar -C dist -czf "nezha-agent-v0.30.00-linux-$arch.tar.gz" .
+          tar -C dist -czf "nezha-agent-v0.30.01-linux-$arch.tar.gz" .
+          cp dist/nezha-agent nezha-agent-linux-amd64
+          cp dist/nezha-supervisor nezha-supervisor-linux-amd64
       - uses: actions/upload-artifact@v4
-        if: runner.os == 'Linux'
         with:
-          name: agent-release-${{ matrix.os }}
-          path: nezha-agent-v0.30.00-linux-*.tar.gz
+          name: agent-release-linux-amd64
+          path: |
+            nezha-agent-v0.30.01-linux-amd64.tar.gz
+            nezha-agent-linux-amd64
+            nezha-supervisor-linux-amd64
           if-no-files-found: error
 
   security-regression:
@@ -87,7 +76,7 @@ jobs:
 
   release:
     if: >-
-      github.event_name == 'push' && github.ref == 'refs/heads/managed-upgrade-v0.30.00' && github.event.head_commit.message == 'release: qualify and publish Agent v0.30.00'
+      github.event_name == 'push' && github.ref == 'refs/heads/url-upgrade-v0.30.01' && github.event.head_commit.message == 'release: qualify and publish Agent v0.30.01'
     needs: [baseline, security-regression]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -99,11 +88,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
-          name: agent-release-ubuntu-24.04
-          path: release-dist
-      - uses: actions/download-artifact@v4
-        with:
-          name: agent-release-ubuntu-24.04-arm
+          name: agent-release-linux-amd64
           path: release-dist
       - name: Publish first independent monitoring Agent release
         env:
@@ -111,8 +96,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -eu
-          for arch in amd64 arm64; do
-            archive="release-dist/nezha-agent-v0.30.00-linux-$arch.tar.gz"
+          for arch in amd64; do
+            archive="release-dist/nezha-agent-v0.30.01-linux-$arch.tar.gz"
             test -s "$archive"
             temp=$(mktemp -d)
             tar -xzf "$archive" -C "$temp"
@@ -120,13 +105,15 @@ jobs:
             grep -Fx "Agent=$GITHUB_SHA" "$temp/SOURCES.txt"
             grep -Fx "Platform=linux/$arch" "$temp/SOURCES.txt"
             if [ "$arch" = amd64 ]; then
-              test "$("$temp/nezha-agent" --version)" = v0.30.00
+              test "$("$temp/nezha-agent" --version)" = v0.30.01
             fi
             rm -rf "$temp"
           done
-          (cd release-dist && sha256sum *.tar.gz > SHA256SUMS)
-          if gh release view v0.30.00 >/dev/null 2>&1; then
+          chmod +x release-dist/nezha-agent-linux-amd64
+          test "$(release-dist/nezha-agent-linux-amd64 --version)" = v0.30.01
+          (cd release-dist && sha256sum *.tar.gz nezha-agent-linux-amd64 nezha-supervisor-linux-amd64 > SHA256SUMS)
+          if gh release view v0.30.01 >/dev/null 2>&1; then
             echo "Release already exists; refusing to overwrite"
             exit 1
           fi
-          gh release create v0.30.00 release-dist/*.tar.gz release-dist/SHA256SUMS --target "$GITHUB_SHA" --title "Nezha Agent v0.30.00" --notes-file RELEASE_V03000.md --latest
+          gh release create v0.30.01 release-dist/*.tar.gz release-dist/nezha-agent-linux-amd64 release-dist/nezha-supervisor-linux-amd64 release-dist/SHA256SUMS --target "$GITHUB_SHA" --title "Nezha Agent v0.30.01" --notes-file RELEASE_V03001.md --latest

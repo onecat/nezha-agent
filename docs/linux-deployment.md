@@ -44,3 +44,12 @@ The replacement is a new monitoring/managed-upgrade Agent, not a full legacy fea
 ```
 
 These are manual deployment instructions, not an executed production migration. Unresolved local persistence failures stop the worker and require recovery; keep the service cgroup, private state and backups intact.
+
+
+## URL upgrade enrollment (v0.30.01, Linux amd64)
+
+For a fresh installation with Dashboard v0.30.08 in automatic URL mode, retain the private agent.json containing the existing TLS endpoint and secret. Verify the release checksums and install the Agent and Supervisor. Prepare the private install/state/stage directories as above, stop the old service, and run once as the service account:
+
+    /usr/local/bin/nezha-supervisor --enroll --config /etc/nezha/supervisor.json --agent-config /etc/nezha/agent.json --root /var/lib/nezha-agent
+
+The certificate-validated TLS connection returns the authenticated server ID and Dashboard public key. The supervisor pins it in the private configuration and initializes a new ledger. Do not reset an existing ledger or overwrite an existing supervisor configuration; existing managed installations require explicit migration. The running service uses the same --config as before. No private signing key is copied to the Agent. A Dashboard key change requires explicit local review.

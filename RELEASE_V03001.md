@@ -1,0 +1,3 @@
+# Agent v0.30.01
+
+Linux amd64 release. Adds one-time authenticated TLS enrollment for Dashboard URL upgrades, with locally pinned public key and existing signed package verification, durable sequence, supervisor health check and rollback. Existing manual provisioning remains supported. This is a monitoring Agent, not a complete replacement for legacy terminal/tunnel/command features. Existing managed ledgers must not be reset. Download the raw binary nezha-agent-linux-amd64 for future URL upgrades; use the archive and supervisor for initial migration. Check SHA256SUMS. The Dashboard URL mode is separately qualified.

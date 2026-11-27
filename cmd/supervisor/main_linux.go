@@ -132,8 +132,16 @@ func run(ctx context.Context,cfg settings,keys map[string]ed25519.PublicKey)erro
 func main(){
  path:=flag.String("config","","private supervisor configuration")
  initialize:=flag.Bool("initialize",false,"provision a new local ledger once")
+ enroll:=flag.Bool("enroll",false,"enroll once with the authenticated TLS Dashboard and initialize a new ledger")
+ agentPath:=flag.String("agent-config","/etc/nezha/agent.json","private Agent configuration for enrollment")
+ root:=flag.String("root","/var/lib/nezha-agent","private Agent installation root for enrollment")
  flag.Parse()
  if flag.NArg()!=0{log.Fatal("unexpected arguments")}
+ if *enroll {
+  if *initialize{log.Fatal("enroll already initializes the ledger")}
+  if err:=enrollLocal(*path,*agentPath,*root);err!=nil{log.Fatal("enrollment refused: ",err)}
+  return
+ }
  cfg,keys,err:=load(*path)
  if err!=nil{log.Fatal("invalid or disabled supervisor provisioning")}
  if *initialize{
