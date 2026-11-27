@@ -65,7 +65,7 @@ func (c *Collector) Host(ctx context.Context,version string)(*model.Host,error){
  return &model.Host{Platform:h.Platform,PlatformVersion:h.PlatformVersion,
   CPU:names,MemTotal:m.Total,SwapTotal:s.Total,DiskTotal:d.Total,
   Arch:runtime.GOARCH,Virtualization:h.VirtualizationSystem,BootTime:h.BootTime,
-  Version:version},nil
+  Version:version,GPU:gpuNames()},nil
 }
 
 func speed(old,current uint64,seconds float64)uint64{
@@ -97,7 +97,7 @@ func (c *Collector) State(ctx context.Context)(*model.HostState,error){
  if err!=nil{return nil,err}
  now:=time.Now()
  result:=&model.HostState{CPU:p[0],MemUsed:m.Used,SwapUsed:s.Used,DiskUsed:d.Used,
-  Uptime:up,NetInTransfer:recv,NetOutTransfer:sent}
+  Uptime:up,NetInTransfer:recv,NetOutTransfer:sent,GPU:gpuUsage()}
  // These supplementary metrics are best-effort: restricted containers and
  // Windows must not lose core monitoring when a platform API is unavailable.
  if avg,err:=load.AvgWithContext(ctx);err==nil&&avg!=nil{
