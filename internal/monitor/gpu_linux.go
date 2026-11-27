@@ -4,6 +4,7 @@ package monitor
 
 import (
  "os"
+ "math"
  "path/filepath"
  "strconv"
  "strings"
@@ -21,7 +22,7 @@ func gpuReading(path string)(float64,bool){
  b,err:=os.ReadFile(path)
  if err!=nil||len(b)>32{return 0,false}
  v,err:=strconv.ParseFloat(strings.TrimSpace(string(b)),64)
- if err!=nil||v<0||v>100{return 0,false}
+ if err!=nil||math.IsNaN(v)||math.IsInf(v,0)||v<0||v>100{return 0,false}
  return v,true
 }
 func gpuUsageAt(root string) float64 {
