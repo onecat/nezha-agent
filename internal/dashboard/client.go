@@ -7,6 +7,7 @@ import (
  "crypto/x509"
  "errors"
  "net"
+ "net/netip"
  "strconv"
  "strings"
  "time"
@@ -92,4 +93,16 @@ func (c *Client) ReportState(ctx context.Context,s *pb.State)error {
 func (c *Client) RequestTasks(ctx context.Context,h *pb.Host)(pb.NezhaService_RequestTaskClient,error) {
  if h==nil { return nil,errors.New("missing host report") }
  return c.rpc.RequestTask(ctx,h)
+}
+
+ // LookupGeoIP uses the Dashboard's embedded database, not an external service.
+func (c *Client) LookupGeoIP(ctx context.Context,ip string)error {
+ a,err:=netip.ParseAddr(ip)
+ if err!=nil || a.Zone()!="" || a.Is4In6() { return errors.New("invalid GeoIP address") }
+ ctx,cancel:=context.WithTimeout(ctx,rpcTimeout)
+ defer cancel()
+ r,err:=c.rpc.LookupGeoIP(ctx,&pb.GeoIP{Ip:a.String()})
+ if err!=nil{return err}
+ if r==nil || r.GetIp()!=a.String(){return errors.New("invalid GeoIP receipt")}
+ return nil
 }
