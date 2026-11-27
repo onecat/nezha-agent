@@ -1,0 +1,26 @@
+name: Agent baseline checks
+on:
+  push:
+    branches: [managed-upgrade-v0.30.00]
+permissions:
+  contents: read
+jobs:
+  baseline:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.4'
+          cache: false
+      - name: Compile inherited protocol and model
+        run: |
+          go test -mod=mod -race -count=1 ./...
+          go vet -mod=mod ./...

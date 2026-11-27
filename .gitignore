@@ -1,8 +1,5 @@
-.DS_Store
-/agent
-/cmd/agent/agent
-/cmd/agent/config.yml
-*.pprof
-dist
-/model/zconfig.go
-nezha-agent-linux
+/nezha-agent
+/nezha-agent.exe
+/data/
+*.pem
+*.key

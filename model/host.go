@@ -1,7 +1,14 @@
+// Adapted from onecat/nezha v0.30.05: local module import only.
 package model
 
 import (
-	pb "github.com/nezhahq/agent/proto"
+	pb "github.com/onecat/nezha-agent/proto"
+)
+
+const (
+	_ = iota
+
+	MTReportHostState
 )
 
 type SensorTemperature struct {
@@ -26,16 +33,7 @@ type HostState struct {
 	UdpConnCount   uint64
 	ProcessCount   uint64
 	Temperatures   []SensorTemperature
-	GPU            []float64
-	GPUs           []GPUStat
-}
-
-// GPUStat carries per-card figures. Memory is in MiB and stays zero on
-// vendors that do not report it, so MemoryTotal == 0 means "unknown".
-type GPUStat struct {
-	Utilization float64
-	MemoryUsed  uint64
-	MemoryTotal uint64
+	GPU            float64
 }
 
 func (s *HostState) PB() *pb.State {
@@ -44,15 +42,6 @@ func (s *HostState) PB() *pb.State {
 		ts = append(ts, &pb.State_SensorTemperature{
 			Name:        t.Name,
 			Temperature: t.Temperature,
-		})
-	}
-
-	gs := make([]*pb.State_GPU, 0, len(s.GPUs))
-	for _, g := range s.GPUs {
-		gs = append(gs, &pb.State_GPU{
-			Utilization: g.Utilization,
-			MemoryUsed:  g.MemoryUsed,
-			MemoryTotal: g.MemoryTotal,
 		})
 	}
 
@@ -74,7 +63,36 @@ func (s *HostState) PB() *pb.State {
 		ProcessCount:   s.ProcessCount,
 		Temperatures:   ts,
 		Gpu:            s.GPU,
-		Gpus:           gs,
+	}
+}
+
+func PB2State(s *pb.State) HostState {
+	var ts []SensorTemperature
+	for _, t := range s.GetTemperatures() {
+		ts = append(ts, SensorTemperature{
+			Name:        t.GetName(),
+			Temperature: t.GetTemperature(),
+		})
+	}
+
+	return HostState{
+		CPU:            s.GetCpu(),
+		MemUsed:        s.GetMemUsed(),
+		SwapUsed:       s.GetSwapUsed(),
+		DiskUsed:       s.GetDiskUsed(),
+		NetInTransfer:  s.GetNetInTransfer(),
+		NetOutTransfer: s.GetNetOutTransfer(),
+		NetInSpeed:     s.GetNetInSpeed(),
+		NetOutSpeed:    s.GetNetOutSpeed(),
+		Uptime:         s.GetUptime(),
+		Load1:          s.GetLoad1(),
+		Load5:          s.GetLoad5(),
+		Load15:         s.GetLoad15(),
+		TcpConnCount:   s.GetTcpConnCount(),
+		UdpConnCount:   s.GetUdpConnCount(),
+		ProcessCount:   s.GetProcessCount(),
+		Temperatures:   ts,
+		GPU:            s.GetGpu(),
 	}
 }
 
@@ -88,6 +106,8 @@ type Host struct {
 	Arch            string
 	Virtualization  string
 	BootTime        uint64
+	IP              string `json:"-"`
+	CountryCode     string
 	Version         string
 	GPU             []string
 }
@@ -103,17 +123,27 @@ func (h *Host) PB() *pb.Host {
 		Arch:            h.Arch,
 		Virtualization:  h.Virtualization,
 		BootTime:        h.BootTime,
+		Ip:              h.IP,
+		CountryCode:     h.CountryCode,
 		Version:         h.Version,
 		Gpu:             h.GPU,
 	}
 }
 
-type GeoIP struct {
-	IP          IP     `json:"ip,omitempty"`
-	CountryCode string `json:"country_code,omitempty"`
-}
-
-type IP struct {
-	IPv4Addr string `json:"ipv4_addr,omitempty"`
-	IPv6Addr string `json:"ipv6_addr,omitempty"`
+func PB2Host(h *pb.Host) Host {
+	return Host{
+		Platform:        h.GetPlatform(),
+		PlatformVersion: h.GetPlatformVersion(),
+		CPU:             h.GetCpu(),
+		MemTotal:        h.GetMemTotal(),
+		DiskTotal:       h.GetDiskTotal(),
+		SwapTotal:       h.GetSwapTotal(),
+		Arch:            h.GetArch(),
+		Virtualization:  h.GetVirtualization(),
+		BootTime:        h.GetBootTime(),
+		IP:              h.GetIp(),
+		CountryCode:     h.GetCountryCode(),
+		Version:         h.GetVersion(),
+		GPU:             h.GetGpu(),
+	}
 }
