@@ -4,7 +4,7 @@ import (
  "context"
  "fmt"
  "math"
- "github.com/shirou/gopsutil/v4/host"
+ "github.com/shirou/gopsutil/v4/sensors"
  "testing"
  "time"
 )
@@ -38,7 +38,7 @@ func TestFiniteNonnegative(t *testing.T){
 }
 
 func TestNormalizeTemperatures(t *testing.T){
- readings:=[]host.TemperatureStat{
+ readings:=[]sensors.TemperatureStat{
   {SensorKey:" cpu ",Temperature:44},
   {SensorKey:"cpu",Temperature:46},
   {SensorKey:"",Temperature:40},
@@ -51,7 +51,7 @@ func TestNormalizeTemperatures(t *testing.T){
  if len(got)!=2||got[0].Name!="cpu"||got[0].Temperature!=44||got[1].Name!="gpu"{
   t.Fatalf("unexpected sensors: %+v",got)
  }
- many:=make([]host.TemperatureStat,100)
- for i:=range many{many[i]=host.TemperatureStat{SensorKey:fmt.Sprintf("sensor-%03d",i),Temperature:40}}
+ many:=make([]sensors.TemperatureStat,100)
+ for i:=range many{many[i]=sensors.TemperatureStat{SensorKey:fmt.Sprintf("sensor-%03d",i),Temperature:40}}
  if len(normalizeTemperatures(many))!=64{t.Fatal("unbounded sensors")}
 }

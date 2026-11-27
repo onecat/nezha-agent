@@ -17,6 +17,7 @@ import (
  "github.com/shirou/gopsutil/v4/cpu"
  "github.com/shirou/gopsutil/v4/disk"
  "github.com/shirou/gopsutil/v4/host"
+ "github.com/shirou/gopsutil/v4/sensors"
  "github.com/shirou/gopsutil/v4/load"
  "github.com/shirou/gopsutil/v4/process"
  "github.com/shirou/gopsutil/v4/mem"
@@ -111,7 +112,7 @@ func (c *Collector) State(ctx context.Context)(*model.HostState,error){
  if connections,err:=netstat.ConnectionsWithContext(ctx,"udp");err==nil{
   result.UdpConnCount=uint64(len(connections))
  }
- if sensors,err:=host.SensorsTemperaturesWithContext(ctx);err==nil{
+ if sensors,err:=sensors.TemperaturesWithContext(ctx);err==nil{
   result.Temperatures=normalizeTemperatures(sensors)
  }
  if !c.last.at.IsZero() {
@@ -131,7 +132,7 @@ func finiteNonnegative(v float64)float64{
  // normalizeTemperatures bounds reported sensor cardinality and discards
  // invalid values and unnamed sensors. Sorting makes reports deterministic
  // across platform enumeration order changes.
-func normalizeTemperatures(sensors []host.TemperatureStat) []model.SensorTemperature {
+func normalizeTemperatures(sensors []sensors.TemperatureStat) []model.SensorTemperature {
  const maxSensors=64
  type reading struct{name string;temperature float64}
  valid:=make([]reading,0,len(sensors))
