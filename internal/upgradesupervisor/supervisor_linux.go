@@ -79,6 +79,8 @@ func(s *Supervisor) Apply(ctx context.Context,expected core.Transaction,r io.Rea
  if expected.State!=core.StateVerified||t.State!=core.StateVerified||oldVersion==""||oldVersion==t.Version{
   return t,errors.New("invalid supervisor upgrade request")
  }
+ current,previous,_,err:=s.state.VersionInfo()
+ if err!=nil||current!=oldVersion||previous!=oldVersion{return t,errors.Join(err,errors.New("rollback version does not match durable ledger"))}
  if err:=ctx.Err();err!=nil{return t,err}
  if !time.Now().Before(t.ExpiresAt){return t,errors.New("expired upgrade")}
  taskCtx,cancel:=context.WithDeadline(ctx,t.ExpiresAt)
@@ -124,7 +126,8 @@ func(s *Supervisor) recoverFailure(expected core.Transaction,oldVersion string,c
 }
 
 func(s *Supervisor) recover(t core.Transaction,oldVersion string)(core.Transaction,error){
- if oldVersion==""||oldVersion==t.Version{return t,errors.New("missing trusted rollback version")}
+ current,previous,_,err:=s.state.VersionInfo()
+ if err!=nil||oldVersion==""||oldVersion==t.Version||oldVersion!=current||oldVersion!=previous{return t,errors.Join(err,errors.New("missing or mismatched trusted rollback version"))}
  ctx,cancel:=context.WithTimeout(context.Background(),3*operationTimeout)
  defer cancel()
  if err:=bounded(ctx,s.worker.Stop);err!=nil{return t,err}
@@ -135,7 +138,9 @@ func(s *Supervisor) recover(t core.Transaction,oldVersion string)(core.Transacti
   if err:=s.startHealthy(ctx,oldVersion);err!=nil{
    return t,errors.Join(err,bounded(context.Background(),s.worker.Stop))
   }
-  return s.state.Advance(t,core.StateFailed,time.Now())
+  done,err:=s.state.Advance(t,core.StateFailed,time.Now())
+  if err!=nil{return done,errors.Join(err,bounded(context.Background(),s.worker.Stop))}
+  return done,nil
  case core.StateInstalling,core.StateHealthCheck,core.StateRollingBack:
   back,err:=s.installer.Restore(t,time.Now())
   if err!=nil{return back,err}
@@ -144,7 +149,9 @@ func(s *Supervisor) recover(t core.Transaction,oldVersion string)(core.Transacti
   }
   // Keep rolling_back on failure; do not claim success before the restored
   // worker has passed the independent health contract.
-  return s.state.Advance(back,core.StateRolledBack,time.Now())
+  done,err:=s.state.Advance(back,core.StateRolledBack,time.Now())
+  if err!=nil{return done,errors.Join(err,bounded(context.Background(),s.worker.Stop))}
+  return done,nil
  default:return t,errors.New("unexpected recovery state")
  }
 }

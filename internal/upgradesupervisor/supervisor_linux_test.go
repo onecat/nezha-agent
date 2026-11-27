@@ -124,3 +124,15 @@ func TestRecoverInterruptedHealthCheck(t *testing.T){
  got,err:=s.Recover("v0.30.00")
  if err!=nil||got.State!=core.StateRolledBack||!f.worker.running{t.Fatal("recovery failed",got,err)}
 }
+
+func TestRejectMismatchedRollbackVersionBeforeStopping(t *testing.T){
+ f:=setup(t)
+ s,err:=New(f.state,f.dir,f.worker)
+ if err!=nil{t.Fatal(err)}
+ if _,err:=s.Apply(context.Background(),f.task,bytes.NewReader(f.archive),int64(len(f.archive)),f.keys,"v0.29.99");err==nil{t.Fatal("mismatched local version accepted")}
+ if !f.worker.running{t.Fatal("worker stopped before version validation")}
+ if _,err:=s.Recover("v0.29.99");err==nil{t.Fatal("mismatched recovery version accepted")}
+ if !f.worker.running{t.Fatal("worker stopped before recovery validation")}
+ _,durable,err:=f.state.Snapshot()
+ if err!=nil||durable==nil||durable.State!=core.StateVerified{t.Fatal("ledger changed",err)}
+}

@@ -1,7 +1,7 @@
 //go:build linux
 
 // Package managedupgrade joins the authenticated transport to the local
-// Linux supervisor. Production startup and polling are not wired here.
+// Linux supervisor. The separate supervisor executable owns startup and polling.
 package managedupgrade
 
 import (
