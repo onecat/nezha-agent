@@ -35,7 +35,7 @@ func roots(path string)(*x509.CertPool,error){
  return p,nil
 }
 
-func run(ctx context.Context,path string)error{
+func run(ctx context.Context,path string,ready func()error)error{
  cfg,err:=config.Load(path)
  if err!=nil{return err}
  pool,err:=roots(cfg.CAFile)
@@ -46,7 +46,7 @@ func run(ctx context.Context,path string)error{
  q,err:=ipquery.New(cfg.IP)
  if err!=nil{return err}
  l:=report.Loop{Collector:new(monitor.Collector),Dashboard:c,Version:version,Interval:cfg.Interval,
-  IPSource:q,GeoLookup:c,PreferIPv6Geo:cfg.PreferIPv6Geo,
+  IPSource:q,GeoLookup:c,PreferIPv6Geo:cfg.PreferIPv6Geo,OnReady:ready,
   OnFailure:func(){log.Print("monitor reporting failed; retrying")},
   OnIPFailure:func(){log.Print("IP discovery or GeoIP lookup unavailable")},
  }
@@ -55,10 +55,14 @@ func run(ctx context.Context,path string)error{
 func main(){
  path:=flag.String("config","agent.json","local private configuration file")
  showVersion:=flag.Bool("version",false,"print version")
+ supervised:=flag.Bool("supervised",false,"use private supervisor pipes (Linux only)")
  flag.Parse()
  if *showVersion {fmt.Println(version);return}
  if flag.NArg()!=0{log.Print("unexpected arguments");os.Exit(2)}
  ctx,stop:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM)
  defer stop()
- if err:=run(ctx,*path);err!=nil && !errors.Is(err,context.Canceled){log.Print(err);os.Exit(1)}
+ ready,closePipes,err:=supervisorPipes(ctx,stop,*supervised)
+ if err!=nil{log.Print(err);os.Exit(1)}
+ defer closePipes()
+ if err:=run(ctx,*path,ready);err!=nil && !errors.Is(err,context.Canceled){log.Print(err);os.Exit(1)}
 }

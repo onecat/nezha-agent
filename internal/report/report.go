@@ -34,6 +34,9 @@ type Loop struct {
  GeoLookup GeoLookup
  PreferIPv6Geo bool
  OnIPFailure func()
+ // OnReady runs once after the first accepted host and state reports.
+ // It must return promptly; failure terminates this reporting loop.
+ OnReady func()error
 
  Collector Collector
  Dashboard Dashboard
@@ -59,6 +62,7 @@ func (l Loop) Run(ctx context.Context)error {
  var nextHost time.Time
  var ipCache string
  retry:=time.Second
+ ready:=false
  for {
   if err:=ctx.Err();err!=nil { return err }
   err:=l.onceWithIP(ctx,&nextHost,&ipCache)
@@ -70,6 +74,10 @@ func (l Loop) Run(ctx context.Context)error {
    retry*=2
    if retry>30*time.Second { retry=30*time.Second }
    continue
+  }
+  if !ready {
+   if l.OnReady!=nil {if err:=l.OnReady();err!=nil{return err}}
+   ready=true
   }
   retry=time.Second
   if err:=wait(ctx,l.Interval);err!=nil { return err }
