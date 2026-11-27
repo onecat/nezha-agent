@@ -1,7 +1,7 @@
 name: Agent development checks
 on:
   push:
-    branches: [single-agent-v0.30.03]
+    branches: [static-agent-v0.30.04]
 permissions:
   contents: read
 jobs:
@@ -20,17 +20,24 @@ jobs:
         run: |
           go test -mod=readonly -race -count=1 ./...
           go vet -mod=readonly ./...
-          go build -mod=readonly ./cmd/agent
-          go run -mod=readonly ./cmd/agent --version
+          CGO_ENABLED=0 go test -mod=readonly -count=1 ./cmd/agent ./internal/config ./internal/dashboard ./internal/monitor ./internal/report ./internal/upgradeinstall ./internal/upgradestate
+          CGO_ENABLED=0 go build -mod=readonly -tags=netgo,osusergo ./cmd/agent
+          CGO_ENABLED=0 go run -mod=readonly ./cmd/agent --version
       - name: Stage native Linux release files
         env:
           GOTOOLCHAIN: local
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
+          GOAMD64: v1
         run: |
           set -eu
           test "$(go env GOARCH)" = amd64
+          test "$(go env CGO_ENABLED)" = 0
           mkdir -p dist
-          go build -mod=readonly -trimpath -ldflags="-s -w -X main.version=v0.30.03" -o dist/nezha-agent ./cmd/agent
-          test "$(dist/nezha-agent --version)" = v0.30.03
+          go build -mod=readonly -trimpath -tags=netgo,osusergo -ldflags="-s -w -X main.version=v0.30.04" -o dist/nezha-agent ./cmd/agent
+          test "$(dist/nezha-agent --version)" = v0.30.04
+          bash script/check-static-agent.sh dist/nezha-agent v0.30.04
           (cd dist && sha256sum nezha-agent > SHA256SUMS && sha256sum -c SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
@@ -67,7 +74,7 @@ jobs:
 
   release:
     if: >-
-      github.event_name == 'push' && github.ref == 'refs/heads/single-agent-v0.30.03' && github.event.head_commit.message == 'release: qualify and publish Agent v0.30.03'
+      github.event_name == 'push' && github.ref == 'refs/heads/static-agent-v0.30.04' && github.event.head_commit.message == 'release: qualify and publish Agent v0.30.04'
     needs: [baseline, security-regression]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -81,17 +88,18 @@ jobs:
         with:
           name: agent-release-linux-amd64
           path: release-dist
-      - name: Publish network accounting Agent release
+      - name: Publish static Linux amd64 Agent release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -eu
           chmod +x release-dist/nezha-agent
-          test "$(release-dist/nezha-agent --version)" = v0.30.03
+          test "$(release-dist/nezha-agent --version)" = v0.30.04
           (cd release-dist && sha256sum -c SHA256SUMS)
-          if gh release view v0.30.03 >/dev/null 2>&1; then
+          bash script/check-static-agent.sh release-dist/nezha-agent v0.30.04
+          if gh release view v0.30.04 >/dev/null 2>&1; then
             echo "Release already exists; refusing to overwrite"
             exit 1
           fi
-          gh release create v0.30.03 release-dist/nezha-agent release-dist/SHA256SUMS --target "$GITHUB_SHA" --title "Nezha Agent v0.30.03" --notes-file RELEASE_V03003.md --latest
+          gh release create v0.30.04 release-dist/nezha-agent release-dist/SHA256SUMS --target "$GITHUB_SHA" --title "Nezha Agent v0.30.04" --notes-file RELEASE_V03004.md --latest

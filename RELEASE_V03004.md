@@ -1,0 +1,5 @@
+# Agent v0.30.04
+
+Fix the GLIBC_2.32 / GLIBC_2.34 runtime incompatibility observed in the v0.30.03 release. Release binary is Linux amd64 (GOAMD64=v1), CGO_ENABLED=0, netgo and osusergo. The native release pipeline rejects ELF interpreter or shared-library dependencies and executes the exact binary inside an empty chroot with no libc or loader, both before staging and before publishing. CGO race tests are retained, and the production pure-Go configuration is separately tested.
+
+No changes to the monitoring protocol, PVE counters, service paths, signed upgrade or recovery logic. Single Agent binary and SHA256SUMS only; no Python3 or independent Supervisor at runtime. Dashboard v0.30.11 pins this release. Existing direct installs must upgrade before repair at a different version; old managed Supervisor layouts still require explicit migration. Compatibility with every kernel or distro is not claimed; systemd, CA trust and user-management tools remain required for installation. Production servers have not been tested.
